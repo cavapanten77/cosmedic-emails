@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
-const { ImapFlow } = require('imapflow');
+const Imap = require('imap');
 const path = require('path');
 
 // Supabase config
@@ -23,36 +23,44 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Save email copy to IMAP Sent folder
-async function saveToSentFolder(rawMessage) {
-    const client = new ImapFlow({
-        host: process.env.SMTP_HOST,
-        port: 993,
-        secure: true,
-        auth: {
+// Save email copy to IMAP Sent folder using node-imap (confirmed working locally)
+function saveToSentFolder(rawMessage) {
+    return new Promise((resolve) => {
+        const imap = new Imap({
             user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASSWORD
-        },
-        logger: false,
-        tls: { rejectUnauthorized: false }
+            password: process.env.SMTP_PASSWORD,
+            host: process.env.SMTP_HOST,
+            port: 993,
+            tls: true,
+            tlsOptions: { rejectUnauthorized: false },
+            connTimeout: 10000,
+            authTimeout: 10000
+        });
+
+        imap.once('ready', function () {
+            console.log('📁 IMAP connected, appending to INBOX.Sent...');
+            imap.append(rawMessage, { mailbox: 'INBOX.Sent', flags: ['Seen'] }, function (err) {
+                if (err) {
+                    console.error('⚠️ IMAP append error:', err.message);
+                } else {
+                    console.log('✅ Email saved to INBOX.Sent successfully');
+                }
+                imap.end();
+                resolve();
+            });
+        });
+
+        imap.once('error', function (err) {
+            console.error('⚠️ IMAP connection error:', err.message);
+            resolve(); // Don't fail the main request
+        });
+
+        imap.once('end', function () {
+            resolve();
+        });
+
+        imap.connect();
     });
-
-    try {
-        console.log('🔄 Connecting to IMAP...');
-        await client.connect();
-
-        const sentFolderPath = 'INBOX/Sent';
-        console.log('📤 Saving to Sent folder:', sentFolderPath);
-
-        await client.append(sentFolderPath, rawMessage, ['\\Seen']);
-        console.log('✅ Email saved to Sent folder successfully');
-        return true;
-    } catch (e) {
-        console.error('⚠️ IMAP Sent folder error:', e.message);
-        return false;
-    } finally {
-        try { await client.logout(); } catch (_) { }
-    }
 }
 
 module.exports = async function handler(req, res) {
@@ -105,31 +113,26 @@ module.exports = async function handler(req, res) {
             attachments: attachments
         };
 
-        // Send email and capture raw message
+        // Send email via SMTP
         console.log('📧 Sending email via SMTP...');
-        const info = await transporter.sendMail({
-            ...mailOptions
-        });
-        console.log('✅ SMTP Send successful:', info.messageId);
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ SMTP send successful:', info.messageId);
 
         // Build raw RFC 2822 message for IMAP
-        const now = new Date().toUTCString();
         const ccLine = (cc && cc.length) ? `Cc: ${cc.join(', ')}\r\n` : '';
         const rawMessage = Buffer.from(
             `From: ${mailOptions.from}\r\n` +
             `To: ${to}\r\n` +
             `${ccLine}` +
             `Subject: ${subject}\r\n` +
-            `Date: ${now}\r\n` +
+            `Date: ${new Date().toUTCString()}\r\n` +
             `MIME-Version: 1.0\r\n` +
             `Content-Type: text/html; charset=utf-8\r\n` +
             `\r\n` +
             `${mailOptions.html}`
         );
 
-        // CRITICAL FIX: Await the IMAP save BEFORE returning the HTTP response.
-        // Vercel serverless functions freeze immediately when the response is sent.
-        console.log('💾 Triggering IMAP save...');
+        // Await IMAP save BEFORE returning (Vercel kills background tasks on res.send)
         await saveToSentFolder(rawMessage);
 
         return res.status(200).json({
