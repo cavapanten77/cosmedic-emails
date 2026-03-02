@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +14,7 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
+
         .email-preview {
             white-space: pre-wrap;
             font-family: Arial, sans-serif;
@@ -20,6 +22,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-50">
     <div id="root"></div>
 
@@ -38,7 +41,7 @@
                 sendEmailEndpoint: '/api/send-email'
             },
             email: {
-                cc: []
+                cc: ['mattia.cardini@medassure.it', 'mfantacci31@gmail.com']
             }
         };
 
@@ -74,7 +77,7 @@ Staff Cosmedic Srl`;
             const [tipiOperazioni, setTipiOperazioni] = useState([]);
             const [loading, setLoading] = useState(false);
             const [history, setHistory] = useState([]);
-            
+
             const [formData, setFormData] = useState({
                 saluto: 'Gentilissimo',
                 titolo: 'Sig.',
@@ -105,7 +108,7 @@ Staff Cosmedic Srl`;
                         .select('*')
                         .eq('attivo', true)
                         .order('nome');
-                    
+
                     if (error) throw error;
                     setTipiOperazioni(data || []);
                 } catch (error) {
@@ -120,7 +123,7 @@ Staff Cosmedic Srl`;
                         .select('*')
                         .order('data_invio', { ascending: false })
                         .limit(20);
-                    
+
                     if (error) throw error;
                     setHistory(data || []);
                 } catch (error) {
@@ -130,18 +133,18 @@ Staff Cosmedic Srl`;
 
             const calculateOrarioArrivo = () => {
                 if (!formData.oraInizio) return '';
-                
+
                 const [ore, minuti] = formData.oraInizio.split(':');
                 const oraInizioDate = new Date();
                 oraInizioDate.setHours(parseInt(ore), parseInt(minuti), 0);
-                
+
                 // Automatico: Cosmedic = 30 min, altre sedi = 60 min
                 const minutiPrima = formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' ? 30 : 60;
                 oraInizioDate.setMinutes(oraInizioDate.getMinutes() - minutiPrima);
-                
+
                 const oreArrivo = String(oraInizioDate.getHours()).padStart(2, '0');
                 const minutiArrivo = String(oraInizioDate.getMinutes()).padStart(2, '0');
-                
+
                 return `${oreArrivo}:${minutiArrivo}`;
             };
 
@@ -151,11 +154,11 @@ Staff Cosmedic Srl`;
 
             const generateEmailPreview = () => {
                 let preview = EMAIL_TEMPLATE;
-                
+
                 const orarioArrivo = calculateOrarioArrivo();
                 const tipoOperazioneNome = getTipoOperazioneNome();
                 const tempoArrivo = getTempoArrivoText();
-                
+
                 const replacements = {
                     saluto: formData.saluto,
                     titolo: formData.titolo,
@@ -173,7 +176,7 @@ Staff Cosmedic Srl`;
                     const regex = new RegExp(`\\{${key}\\}`, 'g');
                     preview = preview.replace(regex, replacements[key]);
                 });
-                
+
                 setEmailPreview(preview);
             };
 
@@ -224,24 +227,24 @@ Staff Cosmedic Srl`;
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                
+
                 if (!formData.nome || !formData.cognome || !formData.emailPaziente) {
                     alert('⚠️ Compilare tutti i campi obbligatori');
                     return;
                 }
 
                 const subject = generateEmailSubject();
-                
+
                 if (!confirm(`Confermi l'invio della email?\n\nOggetto: ${subject}\nA: ${formData.emailPaziente}\nCC: ${CONFIG.email.cc.join(', ')}`)) {
                     return;
                 }
 
                 setLoading(true);
-                
+
                 try {
                     const orarioArrivo = calculateOrarioArrivo();
                     const tempoArrivo = getTempoArrivoText();
-                    
+
                     // Salva nel database
                     const { data: invioData, error: invioError } = await supabase
                         .from('invii_email')
@@ -283,7 +286,7 @@ Staff Cosmedic Srl`;
                     }
 
                     alert('✅ Email inviata con successo!');
-                    
+
                     // Reset form
                     setFormData({
                         saluto: 'Gentilissimo',
@@ -296,10 +299,10 @@ Staff Cosmedic Srl`;
                         oraInizio: '',
                         sedeclinica: 'Cosmedic V. S. Eufemia 17, Milano'
                     });
-                    
+
                     loadHistory();
                     setActiveTab('history');
-                    
+
                 } catch (error) {
                     console.error('Errore:', error);
                     alert('❌ Errore durante l\'invio: ' + error.message);
@@ -327,31 +330,28 @@ Staff Cosmedic Srl`;
                                 <nav className="flex -mb-px">
                                     <button
                                         onClick={() => setActiveTab('form')}
-                                        className={`px-6 py-4 text-sm font-medium ${
-                                            activeTab === 'form'
+                                        className={`px-6 py-4 text-sm font-medium ${activeTab === 'form'
                                                 ? 'border-b-2 border-blue-500 text-blue-600'
                                                 : 'text-gray-500 hover:text-gray-700'
-                                        }`}
+                                            }`}
                                     >
                                         📝 Nuovo Invio
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('preview')}
-                                        className={`px-6 py-4 text-sm font-medium ${
-                                            activeTab === 'preview'
+                                        className={`px-6 py-4 text-sm font-medium ${activeTab === 'preview'
                                                 ? 'border-b-2 border-blue-500 text-blue-600'
                                                 : 'text-gray-500 hover:text-gray-700'
-                                        }`}
+                                            }`}
                                     >
                                         👁️ Anteprima Email
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('history')}
-                                        className={`px-6 py-4 text-sm font-medium ${
-                                            activeTab === 'history'
+                                        className={`px-6 py-4 text-sm font-medium ${activeTab === 'history'
                                                 ? 'border-b-2 border-blue-500 text-blue-600'
                                                 : 'text-gray-500 hover:text-gray-700'
-                                        }`}
+                                            }`}
                                     >
                                         📜 Storico Invii
                                     </button>
@@ -444,7 +444,7 @@ Staff Cosmedic Srl`;
                                                     required
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    CC automatico: (nessuno per il test)
+                                                    CC automatico: mattia.cardini@medassure.it, mfantacci31@gmail.com
                                                 </p>
                                             </div>
 
@@ -528,8 +528,8 @@ Staff Cosmedic Srl`;
                                                             ⏰ {calculateOrarioArrivo()}
                                                         </p>
                                                         <p className="text-xs text-blue-600 mt-1">
-                                                            {formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' 
-                                                                ? '📍 Sede Cosmedic: arrivo 30 minuti prima' 
+                                                            {formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano'
+                                                                ? '📍 Sede Cosmedic: arrivo 30 minuti prima'
                                                                 : '📍 Altra sede: arrivo 1 ora prima'}
                                                         </p>
                                                     </div>
@@ -605,7 +605,7 @@ Staff Cosmedic Srl`;
                                                 Verifica il contenuto prima dell'invio
                                             </p>
                                         </div>
-                                        
+
                                         <div className="bg-white border border-gray-300 rounded-lg p-6">
                                             <div className="mb-4 pb-4 border-b border-gray-200 space-y-2">
                                                 <p className="text-sm text-gray-600">
@@ -615,13 +615,13 @@ Staff Cosmedic Srl`;
                                                     <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
-                                                    <strong>CC:</strong> (nessuno)
+                                                    <strong>CC:</strong> mattia.cardini@medassure.it, mfantacci31@gmail.com
                                                 </p>
                                                 <p className="text-sm text-gray-600">
                                                     <strong>Oggetto:</strong> {generateEmailSubject()}
                                                 </p>
                                             </div>
-                                            
+
                                             <div className="email-preview text-gray-800">
                                                 {emailPreview || 'Compila il form per vedere l\'anteprima'}
                                             </div>
@@ -735,4 +735,5 @@ Staff Cosmedic Srl`;
         ReactDOM.render(<MedicalEmailApp />, document.getElementById('root'));
     </script>
 </body>
+
 </html>
