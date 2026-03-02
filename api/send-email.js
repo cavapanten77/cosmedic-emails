@@ -40,25 +40,10 @@ async function saveToSentFolder(rawMessage) {
     try {
         await client.connect();
 
-        // List all folders to find the Sent one
-        const folders = [];
-        for await (const folder of client.list()) {
-            folders.push(folder);
-        }
-        console.log('📁 IMAP folders found:', folders.map(f => f.path).join(', '));
-
-        // Find Sent folder by special-use flag or by name
-        const sentFolder =
-            folders.find(f => f.specialUse === '\\Sent') ||
-            folders.find(f => /sent|inviati|inviata/i.test(f.path));
-
-        if (!sentFolder) {
-            console.warn('⚠️ Sent folder not found. Available:', folders.map(f => f.path).join(', '));
-            return;
-        }
-
-        console.log('📤 Saving to Sent folder:', sentFolder.path);
-        await client.append(sentFolder.path, rawMessage, ['\\Seen']);
+        // Use the confirmed IMAP path from Thunderbird
+        const sentFolderPath = 'INBOX/Sent';
+        console.log('📤 Saving to Sent folder:', sentFolderPath);
+        await client.append(sentFolderPath, rawMessage, ['\\Seen']);
         console.log('✅ Email saved to Sent folder successfully');
 
     } catch (e) {
