@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Invio Email Interventi - Cosmedic</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .email-preview {
+            white-space: pre-wrap;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ===========================================
+        // CONFIGURAZIONE - INSERISCI I TUOI DATI QUI
+        // ===========================================
+        const CONFIG = {
+            supabase: {
+                url: 'https://ihemonzmqpgfaftmvoqu.supabase.co',
+                anonKey: 'sb_publishable_VczKagO5EGPtqMQO8iYLMQ_ryLB3FJx'
+            },
+            api: {
+                sendEmailEndpoint: '/api/send-email'
+            },
+            email: {
+                cc: ['mattia.cardini@medassure.it', 'mfantacci31@gmail.com']
+            }
+        };
+
+        const supabase = window.supabase.createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+
+        // ===========================================
+        // TEMPLATE EMAIL
+        // ===========================================
+        const EMAIL_TEMPLATE = `{saluto} {titolo} {cognome},
+con la seguente sono a confermarLe l'intervento di {tipoOperazione} per il giorno {dataIntervento}. Alle ore {oraInizio}
+Si richiede di presentarsi in clinica {tempoArrivo} prima dell'orario dell'intervento (quindi alle ore {orarioArrivo}) presso {sedeclinica}.
+
+In preparazione di tale intervento vorrei porre la Sua attenzione su alcuni punti fondamentali perché si svolga tutto nel migliore dei modi:
+- PRE-OPERATORIO: nei giorni precedenti all'intervento, La contatterà l'infermiera professionista Monica Fantacci, che diventerà la Sua referente per il preoperatorio e alla quale dovrà inviare via mail l'esito degli esami. La preghiamo quindi di interfacciarsi solo con Monica e di non far riferimento al personale dello studio Cosmedic o direttamente alla dottoressa Taidelli per non generare confusione.
+- ESAMI PRE-OPERATORI: Alleghiamo copia della ricetta medica per Vs controllo esami. Le prescrizioni sono valide per gli esami da eseguire in regime privato, in caso desiderereste accedere con SSN, rivolgersi al proprio medico di base.
+- GIORNO DELL'INTERVENTO: Il giorno dell'intervento viene indicato in capo all'e-mail, in caso di cambiamenti di orario o giorno, gli stessi verranno prontamente comunicati. Si prega presentarsi il giorno dell'intervento a digiuno di cibo ed acqua dalla mezzanotte, con vestiti comodi; in caso di gel alle unghie dovrà essere totalmente rimosso dal dito indice della mano destra, senza trucco, e con le Vs medicine (se previste nel Vs piano di cura quotidiano) assunte con una minima quantità d'acqua solo per permetterne l'ingerimento, salvo diversa comunicazione precedentemente data dall'anestesista o dalla infermiera.
+- RECESSO: La disdetta dell'intervento, che dovrà essere inviata tassativamente all'indirizzo mail segreteria@cosmedic.it, può essere effettuata entro 15 giorni lavorativi dall'intervento senza costi aggiuntivi o penali. Sarà altresì giustificata, anche il giorno dell'intervento, solo in caso di comprovata emergenza, accompagnata da adeguata certificazione medica o legale. Viceversa, la metà dell'ammontare dell'intervento Le verrà fatturata come acconto sulla riprogrammazione dello stesso o come rimborso spese in caso non venga più effettuato.
+- ASSICURAZIONE INTERVENTO: Consigliamo una assicurazione per le eventuali complicanze relative all'intervento con validità da 1 a 5 anni, a vostra discrezione. Per la sottoscrizione verrà contattata personalmente dal dott. Cardini Mattia, referente Medassure che ci legge in copia, lo stesso le invierà la documentazione necessaria per la sottoscrizione e per il saldo, che dovrà essere da lei effettuato prima dell'intervento, tutto direttamente con assicuratore. L'ammontare di tale somma, ricordiamo, non è annoverato nelle voci del preventivo. Se si desidera sottoscrivere la procedura di adesione, si ricorda che LA SOTTOSCRIZIONE della stessa dovrà essere effettuata entro E NON OLTRE le ore 24.00 del giorno precedente la data programmata per l'intervento, poi riceverà la Polizza al Suo indirizzo di posta elettronica. In caso il Dottor Cardini non la contattasse, le chiediamo la cortesia di scrivergli direttamente Lei una mail.
+- MODALITA' DI PAGAMENTO: il saldo dell'intervento verrà versato il giorno dell'intervento con modalità previamente concordata con la Dottoressa Taidelli in sede di colloquio. Nei giorni successivi all'intervento riceverà le fatture relative ai pagamenti effettuati e concordati.
+
+Ricordiamo che la data e l'orario dell'intervento potranno subire variazioni fino a 48 ore dallo stesso, a seconda delle prenotazioni e della disponibilità della sala operatoria.
+Per confermare la prenotazione dell'intervento, Le chiederei cortesemente di rispondere a questa mail per accettazione delle clausole di cui sopra e di mantenere in copia conoscenza lo Studio Medico Cosmedic nella corrispondenza mail.
+Rimaniamo in attesa di gentile riscontro e a disposizione per qualsiasi ulteriore chiarimento.
+Cordiali saluti.
+
+Staff Cosmedic Srl`;
+
+        // ===========================================
+        // COMPONENTE PRINCIPALE
+        // ===========================================
+        function MedicalEmailApp() {
+            const [activeTab, setActiveTab] = useState('form');
+            const [tipiOperazioni, setTipiOperazioni] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [history, setHistory] = useState([]);
+            
+            const [formData, setFormData] = useState({
+                saluto: 'Gentilissimo',
+                titolo: 'Sig.',
+                nome: '',
+                cognome: '',
+                emailPaziente: '',
+                dataIntervento: '',
+                tipoOperazione: '',
+                oraInizio: '',
+                sedeclinica: 'Cosmedic V. S. Eufemia 17, Milano'
+            });
+
+            const [emailPreview, setEmailPreview] = useState('');
+
+            useEffect(() => {
+                loadTipiOperazioni();
+                loadHistory();
+            }, []);
+
+            useEffect(() => {
+                generateEmailPreview();
+            }, [formData, tipiOperazioni]);
+
+            const loadTipiOperazioni = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('tipi_operazioni')
+                        .select('*')
+                        .eq('attivo', true)
+                        .order('nome');
+                    
+                    if (error) throw error;
+                    setTipiOperazioni(data || []);
+                } catch (error) {
+                    console.error('Errore caricamento operazioni:', error);
+                }
+            };
+
+            const loadHistory = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('invii_email')
+                        .select('*')
+                        .order('data_invio', { ascending: false })
+                        .limit(20);
+                    
+                    if (error) throw error;
+                    setHistory(data || []);
+                } catch (error) {
+                    console.error('Errore caricamento storico:', error);
+                }
+            };
+
+            const calculateOrarioArrivo = () => {
+                if (!formData.oraInizio) return '';
+                
+                const [ore, minuti] = formData.oraInizio.split(':');
+                const oraInizioDate = new Date();
+                oraInizioDate.setHours(parseInt(ore), parseInt(minuti), 0);
+                
+                // Automatico: Cosmedic = 30 min, altre sedi = 60 min
+                const minutiPrima = formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' ? 30 : 60;
+                oraInizioDate.setMinutes(oraInizioDate.getMinutes() - minutiPrima);
+                
+                const oreArrivo = String(oraInizioDate.getHours()).padStart(2, '0');
+                const minutiArrivo = String(oraInizioDate.getMinutes()).padStart(2, '0');
+                
+                return `${oreArrivo}:${minutiArrivo}`;
+            };
+
+            const getTempoArrivoText = () => {
+                return formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' ? 'mezz\'ora' : '1 ora';
+            };
+
+            const generateEmailPreview = () => {
+                let preview = EMAIL_TEMPLATE;
+                
+                const orarioArrivo = calculateOrarioArrivo();
+                const tipoOperazioneNome = getTipoOperazioneNome();
+                const tempoArrivo = getTempoArrivoText();
+                
+                const replacements = {
+                    saluto: formData.saluto,
+                    titolo: formData.titolo,
+                    nome: formData.nome || '{nome}',
+                    cognome: formData.cognome || '{cognome}',
+                    tipoOperazione: tipoOperazioneNome || '{tipoOperazione}',
+                    dataIntervento: formData.dataIntervento ? formatDateFull(formData.dataIntervento) : '{dataIntervento}',
+                    oraInizio: formData.oraInizio || '{oraInizio}',
+                    tempoArrivo: tempoArrivo,
+                    orarioArrivo: orarioArrivo || '{orarioArrivo}',
+                    sedeclinica: formData.sedeclinica
+                };
+
+                Object.keys(replacements).forEach(key => {
+                    const regex = new RegExp(`\\{${key}\\}`, 'g');
+                    preview = preview.replace(regex, replacements[key]);
+                });
+                
+                setEmailPreview(preview);
+            };
+
+            const getTipoOperazioneNome = () => {
+                const operazione = tipiOperazioni.find(op => op.id === parseInt(formData.tipoOperazione));
+                return operazione?.nome || '';
+            };
+
+            const getAllegati = () => {
+                const operazione = tipiOperazioni.find(op => op.id === parseInt(formData.tipoOperazione));
+                return operazione?.allegati || [];
+            };
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: value
+                }));
+            };
+
+            const formatDateFull = (dateString) => {
+                if (!dateString) return '';
+                const date = new Date(dateString + 'T00:00:00');
+                return date.toLocaleDateString('it-IT', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            };
+
+            const formatDateShort = (dateString) => {
+                if (!dateString) return '';
+                const date = new Date(dateString + 'T00:00:00');
+                return date.toLocaleDateString('it-IT', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            };
+
+            const generateEmailSubject = () => {
+                const tipoOp = getTipoOperazioneNome().toUpperCase();
+                const data = formatDateShort(formData.dataIntervento);
+                return `INTERVENTO DI ${tipoOp || '...'} DEL ${data || '...'}`;
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                
+                if (!formData.nome || !formData.cognome || !formData.emailPaziente) {
+                    alert('⚠️ Compilare tutti i campi obbligatori');
+                    return;
+                }
+
+                const subject = generateEmailSubject();
+                
+                if (!confirm(`Confermi l'invio della email?\n\nOggetto: ${subject}\nA: ${formData.emailPaziente}\nCC: ${CONFIG.email.cc.join(', ')}`)) {
+                    return;
+                }
+
+                setLoading(true);
+                
+                try {
+                    const orarioArrivo = calculateOrarioArrivo();
+                    const tempoArrivo = getTempoArrivoText();
+                    
+                    // Salva nel database
+                    const { data: invioData, error: invioError } = await supabase
+                        .from('invii_email')
+                        .insert([{
+                            titolo: `${formData.saluto} ${formData.titolo}`,
+                            nome: formData.nome,
+                            cognome: formData.cognome,
+                            email_paziente: formData.emailPaziente,
+                            data_intervento: formData.dataIntervento,
+                            tipo_operazione_id: parseInt(formData.tipoOperazione),
+                            orario_arrivo: orarioArrivo,
+                            ora_inizio: formData.oraInizio,
+                            contenuto_email: emailPreview,
+                            allegati: getAllegati(),
+                            note: `Sede: ${formData.sedeclinica}, Tempo arrivo: ${tempoArrivo}`
+                        }])
+                        .select();
+
+                    if (invioError) throw invioError;
+
+                    // Invia email tramite backend
+                    const response = await fetch(CONFIG.api.sendEmailEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            to: formData.emailPaziente,
+                            cc: CONFIG.email.cc,
+                            subject: subject,
+                            body: emailPreview,
+                            attachmentPaths: getAllegati()
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Errore invio email');
+                    }
+
+                    alert('✅ Email inviata con successo!');
+                    
+                    // Reset form
+                    setFormData({
+                        saluto: 'Gentilissimo',
+                        titolo: 'Sig.',
+                        nome: '',
+                        cognome: '',
+                        emailPaziente: '',
+                        dataIntervento: '',
+                        tipoOperazione: '',
+                        oraInizio: '',
+                        sedeclinica: 'Cosmedic V. S. Eufemia 17, Milano'
+                    });
+                    
+                    loadHistory();
+                    setActiveTab('history');
+                    
+                } catch (error) {
+                    console.error('Errore:', error);
+                    alert('❌ Errore durante l\'invio: ' + error.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 py-8">
+                    <div className="max-w-6xl mx-auto px-4">
+                        {/* Header */}
+                        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <h1 className="text-3xl font-bold text-gray-800">
+                                📧 Sistema Invio Email Interventi - Cosmedic
+                            </h1>
+                            <p className="text-gray-600 mt-2">
+                                Gestione rapida delle comunicazioni ai pazienti
+                            </p>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="bg-white rounded-lg shadow-md mb-6">
+                            <div className="border-b border-gray-200">
+                                <nav className="flex -mb-px">
+                                    <button
+                                        onClick={() => setActiveTab('form')}
+                                        className={`px-6 py-4 text-sm font-medium ${
+                                            activeTab === 'form'
+                                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        📝 Nuovo Invio
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('preview')}
+                                        className={`px-6 py-4 text-sm font-medium ${
+                                            activeTab === 'preview'
+                                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        👁️ Anteprima Email
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('history')}
+                                        className={`px-6 py-4 text-sm font-medium ${
+                                            activeTab === 'history'
+                                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        📜 Storico Invii
+                                    </button>
+                                </nav>
+                            </div>
+
+                            <div className="p-6">
+                                {/* Tab Form */}
+                                {activeTab === 'form' && (
+                                    <form onSubmit={handleSubmit} className="space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Saluto */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Saluto *
+                                                </label>
+                                                <select
+                                                    name="saluto"
+                                                    value={formData.saluto}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                >
+                                                    <option value="Gentilissimo">Gentilissimo</option>
+                                                    <option value="Gentilissima">Gentilissima</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Titolo */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Titolo *
+                                                </label>
+                                                <select
+                                                    name="titolo"
+                                                    value={formData.titolo}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                >
+                                                    <option value="Sig.">Sig.</option>
+                                                    <option value="Sig.ra">Sig.ra</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Nome */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Nome *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="nome"
+                                                    value={formData.nome}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    placeholder="Mario"
+                                                    required
+                                                />
+                                            </div>
+
+                                            {/* Cognome */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Cognome *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="cognome"
+                                                    value={formData.cognome}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    placeholder="Rossi"
+                                                    required
+                                                />
+                                            </div>
+
+                                            {/* Email Paziente */}
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Email Paziente *
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    name="emailPaziente"
+                                                    value={formData.emailPaziente}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    placeholder="paziente@email.com"
+                                                    required
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    CC automatico: mattia.cardini@medassure.it, mfantacci31@gmail.com
+                                                </p>
+                                            </div>
+
+                                            {/* Tipo Operazione */}
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Tipo Operazione *
+                                                </label>
+                                                <select
+                                                    name="tipoOperazione"
+                                                    value={formData.tipoOperazione}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                >
+                                                    <option value="">Seleziona un tipo...</option>
+                                                    {tipiOperazioni.map(op => (
+                                                        <option key={op.id} value={op.id}>
+                                                            {op.nome}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Data Intervento */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Data Intervento *
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    name="dataIntervento"
+                                                    value={formData.dataIntervento}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                />
+                                            </div>
+
+                                            {/* Ora Inizio Intervento */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Ora Inizio Intervento *
+                                                </label>
+                                                <select
+                                                    name="oraInizio"
+                                                    value={formData.oraInizio}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                >
+                                                    <option value="">Seleziona orario...</option>
+                                                    <option value="08:00">08:00</option>
+                                                    <option value="08:30">08:30</option>
+                                                    <option value="09:00">09:00</option>
+                                                    <option value="09:30">09:30</option>
+                                                    <option value="10:00">10:00</option>
+                                                    <option value="10:30">10:30</option>
+                                                    <option value="11:00">11:00</option>
+                                                    <option value="11:30">11:30</option>
+                                                    <option value="12:00">12:00</option>
+                                                    <option value="12:30">12:30</option>
+                                                    <option value="13:00">13:00</option>
+                                                    <option value="13:30">13:30</option>
+                                                    <option value="14:00">14:00</option>
+                                                    <option value="14:30">14:30</option>
+                                                    <option value="15:00">15:00</option>
+                                                    <option value="15:30">15:30</option>
+                                                    <option value="16:00">16:00</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Orario Arrivo Calcolato Automaticamente */}
+                                            {formData.oraInizio && formData.sedeclinica && (
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Orario Arrivo (calcolato automaticamente)
+                                                    </label>
+                                                    <div className="w-full px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                                        <p className="text-gray-700 font-medium">
+                                                            ⏰ {calculateOrarioArrivo()}
+                                                        </p>
+                                                        <p className="text-xs text-blue-600 mt-1">
+                                                            {formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' 
+                                                                ? '📍 Sede Cosmedic: arrivo 30 minuti prima' 
+                                                                : '📍 Altra sede: arrivo 1 ora prima'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Sede Clinica */}
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Sede Clinica *
+                                                </label>
+                                                <select
+                                                    name="sedeclinica"
+                                                    value={formData.sedeclinica}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    required
+                                                >
+                                                    <option value="Cosmedic V. S. Eufemia 17, Milano">Cosmedic V. S. Eufemia 17, Milano</option>
+                                                    <option value="RESNATI PUNTO RAF VIA SANTA CROCE 10|A, Milano">RESNATI PUNTO RAF VIA SANTA CROCE 10|A, Milano</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Info Allegati */}
+                                        {formData.tipoOperazione && getAllegati().length > 0 && (
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                <h3 className="font-medium text-blue-900 mb-2">📎 Allegati da includere:</h3>
+                                                <ul className="list-disc list-inside text-blue-800 text-sm">
+                                                    {getAllegati().map((allegato, idx) => (
+                                                        <li key={idx}>{allegato.split('/').pop()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Anteprima Oggetto */}
+                                        {formData.tipoOperazione && formData.dataIntervento && (
+                                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                                <h3 className="font-medium text-gray-900 mb-2">✉️ Oggetto email:</h3>
+                                                <p className="text-gray-700 font-mono text-sm">{generateEmailSubject()}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Bottoni */}
+                                        <div className="flex gap-4">
+                                            <button
+                                                type="submit"
+                                                disabled={loading}
+                                                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                {loading ? '⏳ Invio in corso...' : '✉️ Invia Email'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTab('preview')}
+                                                className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                                            >
+                                                👁️ Visualizza Anteprima
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {/* Tab Anteprima */}
+                                {activeTab === 'preview' && (
+                                    <div>
+                                        <div className="mb-4">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                                Anteprima Email
+                                            </h3>
+                                            <p className="text-sm text-gray-600">
+                                                Verifica il contenuto prima dell'invio
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="bg-white border border-gray-300 rounded-lg p-6">
+                                            <div className="mb-4 pb-4 border-b border-gray-200 space-y-2">
+                                                <p className="text-sm text-gray-600">
+                                                    <strong>Da:</strong> segreteria@cosmedic.it
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                    <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                    <strong>CC:</strong> mattia.cardini@medassure.it, mfantacci31@gmail.com
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                    <strong>Oggetto:</strong> {generateEmailSubject()}
+                                                </p>
+                                            </div>
+                                            
+                                            <div className="email-preview text-gray-800">
+                                                {emailPreview || 'Compila il form per vedere l\'anteprima'}
+                                            </div>
+
+                                            {formData.tipoOperazione && getAllegati().length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                                    <p className="text-sm text-gray-600 font-medium mb-2">📎 Allegati:</p>
+                                                    <ul className="text-sm text-gray-600">
+                                                        {getAllegati().map((allegato, idx) => (
+                                                            <li key={idx} className="ml-4">• {allegato.split('/').pop()}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-4 flex gap-4">
+                                            <button
+                                                onClick={() => setActiveTab('form')}
+                                                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                            >
+                                                ← Torna al Form
+                                            </button>
+                                            {formData.emailPaziente && (
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('form');
+                                                        setTimeout(() => {
+                                                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                                        }, 100);
+                                                    }}
+                                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                                >
+                                                    ✉️ Procedi all'Invio
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tab Storico */}
+                                {activeTab === 'history' && (
+                                    <div>
+                                        <div className="mb-4 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                                    Storico Invii Email
+                                                </h3>
+                                                <p className="text-sm text-gray-600">
+                                                    Ultimi 20 invii effettuati
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={loadHistory}
+                                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                            >
+                                                🔄 Aggiorna
+                                            </button>
+                                        </div>
+
+                                        {history.length === 0 ? (
+                                            <div className="text-center py-12 text-gray-500">
+                                                <p className="text-lg mb-2">📭</p>
+                                                <p>Nessun invio registrato</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {history.map((item, idx) => (
+                                                    <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div>
+                                                                <h4 className="font-medium text-gray-800">
+                                                                    {item.titolo} {item.nome} {item.cognome}
+                                                                </h4>
+                                                                <p className="text-sm text-gray-600">
+                                                                    ✉️ {item.email_paziente}
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                                                {new Date(item.data_invio).toLocaleString('it-IT', {
+                                                                    day: '2-digit',
+                                                                    month: '2-digit',
+                                                                    year: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-sm text-gray-600 space-y-1">
+                                                            <p>📅 Intervento: {formatDateShort(item.data_intervento)}</p>
+                                                            <p>🕐 Arrivo: {item.orario_arrivo} | Inizio: {item.ora_inizio}</p>
+                                                            {item.allegati && item.allegati.length > 0 && (
+                                                                <p className="text-xs text-gray-500">
+                                                                    📎 {item.allegati.length} allegato/i
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<MedicalEmailApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
