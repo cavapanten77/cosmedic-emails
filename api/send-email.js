@@ -23,7 +23,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Save email copy to IMAP Sent folder
+// Save email copy to IMAP Sent folder (auto-detect folder name)
 async function saveToSentFolder(rawMessage) {
     const client = new ImapFlow({
         host: process.env.SMTP_HOST,
@@ -33,28 +33,36 @@ async function saveToSentFolder(rawMessage) {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASSWORD
         },
-        logger: false
+        logger: false,
+        tls: { rejectUnauthorized: false }
     });
 
     try {
         await client.connect();
-        // Try common Italian/English sent folder names
-        const sentFolders = ['Sent', 'Inviati', 'INBOX.Sent', 'Sent Messages'];
-        let saved = false;
-        for (const folder of sentFolders) {
-            try {
-                await client.append(folder, rawMessage, ['\\Seen']);
-                saved = true;
-                break;
-            } catch (e) {
-                // Try next folder name
-            }
+
+        // List all folders to find the Sent one
+        const folders = [];
+        for await (const folder of client.list()) {
+            folders.push(folder);
         }
-        if (!saved) {
-            console.warn('⚠️ Could not find Sent folder, tried:', sentFolders);
+        console.log('📁 IMAP folders found:', folders.map(f => f.path).join(', '));
+
+        // Find Sent folder by special-use flag or by name
+        const sentFolder =
+            folders.find(f => f.specialUse === '\\Sent') ||
+            folders.find(f => /sent|inviati|inviata/i.test(f.path));
+
+        if (!sentFolder) {
+            console.warn('⚠️ Sent folder not found. Available:', folders.map(f => f.path).join(', '));
+            return;
         }
+
+        console.log('📤 Saving to Sent folder:', sentFolder.path);
+        await client.append(sentFolder.path, rawMessage, ['\\Seen']);
+        console.log('✅ Email saved to Sent folder successfully');
+
     } catch (e) {
-        console.error('⚠️ IMAP Sent folder error (non-critical):', e.message);
+        console.error('⚠️ IMAP Sent folder error:', e.message);
     } finally {
         try { await client.logout(); } catch (_) { }
     }
@@ -110,15 +118,30 @@ module.exports = async function handler(req, res) {
             attachments: attachments
         };
 
-        // Send and get raw message for IMAP
-        const info = await transporter.sendMail(mailOptions);
+        // Send email and capture raw message
+        let rawMessage = null;
+        const info = await transporter.sendMail({
+            ...mailOptions,
+            // nodemailer can return raw message via envelope
+        });
 
-        // Save to IMAP Sent folder in background (non-blocking)
-        if (info.response) {
-            // nodemailer doesn't give us raw message easily, so we build a minimal one
-            const rawMsg = `From: ${mailOptions.from}\r\nTo: ${to}\r\nCc: ${(cc || []).join(', ')}\r\nSubject: ${subject}\r\nDate: ${new Date().toUTCString()}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`;
-            saveToSentFolder(Buffer.from(rawMsg)).catch(e => console.error('IMAP error:', e));
-        }
+        // Build raw RFC 2822 message for IMAP
+        const now = new Date().toUTCString();
+        const ccLine = (cc && cc.length) ? `Cc: ${cc.join(', ')}\r\n` : '';
+        rawMessage = Buffer.from(
+            `From: ${mailOptions.from}\r\n` +
+            `To: ${to}\r\n` +
+            `${ccLine}` +
+            `Subject: ${subject}\r\n` +
+            `Date: ${now}\r\n` +
+            `MIME-Version: 1.0\r\n` +
+            `Content-Type: text/plain; charset=utf-8\r\n` +
+            `\r\n` +
+            `${body}`
+        );
+
+        // Save to IMAP Sent in background
+        saveToSentFolder(rawMessage).catch(e => console.error('IMAP background error:', e));
 
         return res.status(200).json({
             success: true,
