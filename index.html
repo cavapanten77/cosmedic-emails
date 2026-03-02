@@ -41,7 +41,7 @@
                 sendEmailEndpoint: '/api/send-email'
             },
             email: {
-                cc: []
+                cc: ['mattia.cardini@medassure.it', 'mfantacci31@gmail.com']
             }
         };
 
@@ -444,7 +444,7 @@ Staff Cosmedic Srl`;
                                                     required
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    CC automatico: (nessuno per il test)
+                                                    CC automatico: mattia.cardini@medassure.it, mfantacci31@gmail.com
                                                 </p>
                                             </div>
 
@@ -615,7 +615,7 @@ Staff Cosmedic Srl`;
                                                     <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
-                                                    <strong>CC:</strong> (nessuno)
+                                                    <strong>CC:</strong> mattia.cardini@medassure.it, mfantacci31@gmail.com
                                                 </p>
                                                 <p className="text-sm text-gray-600">
                                                     <strong>Oggetto:</strong> {generateEmailSubject()}
