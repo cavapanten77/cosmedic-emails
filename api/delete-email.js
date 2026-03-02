@@ -1,10 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Use service key to bypass RLS
-const supabase = createClient(
-    process.env.SUPABASE_URL || 'https://ihemonzmqpgfaftmvoqu.supabase.co',
-    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
-);
+const SUPABASE_URL = 'https://ihemonzmqpgfaftmvoqu.supabase.co';
 
 module.exports = async function handler(req, res) {
     if (req.method !== 'DELETE') {
@@ -17,17 +13,34 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'ID mancante' });
     }
 
-    try {
-        const { error } = await supabase
-            .from('invii_email')
-            .delete()
-            .eq('id', id);
+    // Use service key (bypasses RLS); fall back to anon key
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+    console.log('Using key type:', process.env.SUPABASE_SERVICE_KEY ? 'SERVICE_KEY' : 'ANON_KEY');
 
-        if (error) throw error;
+    const supabase = createClient(
+        process.env.SUPABASE_URL || SUPABASE_URL,
+        serviceKey
+    );
 
-        return res.status(200).json({ success: true });
-    } catch (error) {
-        console.error('Errore eliminazione:', error);
-        return res.status(500).json({ success: false, message: error.message });
+    const { data, error, count } = await supabase
+        .from('invii_email')
+        .delete()
+        .eq('id', id)
+        .select(); // .select() makes Supabase return deleted rows, confirming the delete happened
+
+    console.log('Delete result - data:', data, 'error:', error, 'count:', count);
+
+    if (error) {
+        return res.status(500).json({ success: false, message: error.message, code: error.code });
     }
+
+    // If data is empty array, RLS silently blocked the delete
+    if (!data || data.length === 0) {
+        return res.status(403).json({
+            success: false,
+            message: 'Nessuna riga eliminata — accesso bloccato (RLS). Aggiungere policy DELETE su Supabase.'
+        });
+    }
+
+    return res.status(200).json({ success: true, deleted: data });
 };
