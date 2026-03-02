@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
-import { createClient } from '@supabase/supabase-js';
-import path from 'path';
+const nodemailer = require('nodemailer');
+const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
 
 // Supabase config
 const supabase = createClient(
@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     // Only allow POST
     if (req.method !== 'POST') {
         return res.status(405).json({ success: false, message: 'Method Not Allowed' });
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         if (!to || !subject || !body) {
             return res.status(400).json({
                 success: false,
-                message: 'Parámetros faltantes: to, subject, body son obligatorios'
+                message: 'Parametri mancanti: to, subject, body sono obbligatori'
             });
         }
 
@@ -91,4 +91,4 @@ export default async function handler(req, res) {
             error: error.message
         });
     }
-}
+};
