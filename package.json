@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",
+    "imapflow": "^1.0.158",
     "nodemailer": "^6.9.9",
     "path": "^0.12.7"
   }
