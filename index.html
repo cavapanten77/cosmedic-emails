@@ -134,15 +134,17 @@ Staff Cosmedic Srl`;
             const deleteHistoryItem = async (id, nome, cognome) => {
                 if (!window.confirm(`Eliminare la voce "${nome} ${cognome}" dallo storico?`)) return;
                 try {
-                    const { error } = await supabase
-                        .from('invii_email')
-                        .delete()
-                        .eq('id', id);
-                    if (error) throw error;
+                    const response = await fetch('/api/delete-email', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id })
+                    });
+                    const result = await response.json();
+                    if (!result.success) throw new Error(result.message);
                     setHistory(prev => prev.filter(item => item.id !== id));
                 } catch (error) {
                     console.error('Errore eliminazione:', error);
-                    alert('Errore durante l\'eliminazione.');
+                    alert('Errore durante l\'eliminazione: ' + error.message);
                 }
             };
 
