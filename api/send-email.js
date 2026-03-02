@@ -23,7 +23,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Save email copy to IMAP Sent folder (auto-detect folder name)
+// Save email copy to IMAP Sent folder
 async function saveToSentFolder(rawMessage) {
     const client = new ImapFlow({
         host: process.env.SMTP_HOST,
@@ -38,16 +38,18 @@ async function saveToSentFolder(rawMessage) {
     });
 
     try {
+        console.log('🔄 Connecting to IMAP...');
         await client.connect();
 
-        // Use the confirmed IMAP path from Thunderbird
         const sentFolderPath = 'INBOX/Sent';
         console.log('📤 Saving to Sent folder:', sentFolderPath);
+
         await client.append(sentFolderPath, rawMessage, ['\\Seen']);
         console.log('✅ Email saved to Sent folder successfully');
-
+        return true;
     } catch (e) {
         console.error('⚠️ IMAP Sent folder error:', e.message);
+        return false;
     } finally {
         try { await client.logout(); } catch (_) { }
     }
@@ -104,29 +106,31 @@ module.exports = async function handler(req, res) {
         };
 
         // Send email and capture raw message
-        let rawMessage = null;
+        console.log('📧 Sending email via SMTP...');
         const info = await transporter.sendMail({
-            ...mailOptions,
-            // nodemailer can return raw message via envelope
+            ...mailOptions
         });
+        console.log('✅ SMTP Send successful:', info.messageId);
 
         // Build raw RFC 2822 message for IMAP
         const now = new Date().toUTCString();
         const ccLine = (cc && cc.length) ? `Cc: ${cc.join(', ')}\r\n` : '';
-        rawMessage = Buffer.from(
+        const rawMessage = Buffer.from(
             `From: ${mailOptions.from}\r\n` +
             `To: ${to}\r\n` +
             `${ccLine}` +
             `Subject: ${subject}\r\n` +
             `Date: ${now}\r\n` +
             `MIME-Version: 1.0\r\n` +
-            `Content-Type: text/plain; charset=utf-8\r\n` +
+            `Content-Type: text/html; charset=utf-8\r\n` +
             `\r\n` +
-            `${body}`
+            `${mailOptions.html}`
         );
 
-        // Save to IMAP Sent in background
-        saveToSentFolder(rawMessage).catch(e => console.error('IMAP background error:', e));
+        // CRITICAL FIX: Await the IMAP save BEFORE returning the HTTP response.
+        // Vercel serverless functions freeze immediately when the response is sent.
+        console.log('💾 Triggering IMAP save...');
+        await saveToSentFolder(rawMessage);
 
         return res.status(200).json({
             success: true,
