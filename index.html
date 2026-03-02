@@ -122,12 +122,27 @@ Staff Cosmedic Srl`;
                         .from('invii_email')
                         .select('*')
                         .order('data_invio', { ascending: false })
-                        .limit(20);
+                        .limit(50);
 
                     if (error) throw error;
                     setHistory(data || []);
                 } catch (error) {
                     console.error('Errore caricamento storico:', error);
+                }
+            };
+
+            const deleteHistoryItem = async (id, nome, cognome) => {
+                if (!window.confirm(`Eliminare la voce "${nome} ${cognome}" dallo storico?`)) return;
+                try {
+                    const { error } = await supabase
+                        .from('invii_email')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+                    setHistory(prev => prev.filter(item => item.id !== id));
+                } catch (error) {
+                    console.error('Errore eliminazione:', error);
+                    alert('Errore durante l\'eliminazione.');
                 }
             };
 
@@ -700,15 +715,24 @@ Staff Cosmedic Srl`;
                                                                     ✉️ {item.email_paziente}
                                                                 </p>
                                                             </div>
-                                                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
-                                                                {new Date(item.data_invio).toLocaleString('it-IT', {
-                                                                    day: '2-digit',
-                                                                    month: '2-digit',
-                                                                    year: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                })}
-                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                                                    {new Date(item.data_invio).toLocaleString('it-IT', {
+                                                                        day: '2-digit',
+                                                                        month: '2-digit',
+                                                                        year: 'numeric',
+                                                                        hour: '2-digit',
+                                                                        minute: '2-digit'
+                                                                    })}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => deleteHistoryItem(item.id, item.nome, item.cognome)}
+                                                                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Elimina"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         <div className="text-sm text-gray-600 space-y-1">
                                                             <p>📅 Intervento: {formatDateShort(item.data_intervento)}</p>
