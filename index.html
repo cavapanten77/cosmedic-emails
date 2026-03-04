@@ -85,7 +85,7 @@ Staff Cosmedic Srl`;
                 cognome: '',
                 emailPaziente: '',
                 dataIntervento: '',
-                tipoOperazione: '',
+                operazioniSelezionate: [],
                 oraInizio: '',
                 sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
             });
@@ -198,13 +198,18 @@ Staff Cosmedic Srl`;
             };
 
             const getTipoOperazioneNome = () => {
-                const operazione = tipiOperazioni.find(op => op.id === parseInt(formData.tipoOperazione));
-                return operazione?.nome || '';
+                return formData.operazioniSelezionate
+                    .map(id => tipiOperazioni.find(op => op.id === id)?.nome)
+                    .filter(Boolean)
+                    .join(', ');
             };
 
             const getAllegati = () => {
-                const operazione = tipiOperazioni.find(op => op.id === parseInt(formData.tipoOperazione));
-                return operazione?.allegati || [];
+                return formData.operazioniSelezionate
+                    .flatMap(id => {
+                        const op = tipiOperazioni.find(o => o.id === id);
+                        return op?.allegati || [];
+                    });
             };
 
             const handleInputChange = (e) => {
@@ -213,6 +218,17 @@ Staff Cosmedic Srl`;
                     ...prev,
                     [name]: value
                 }));
+            };
+
+            const handleOperazioneChange = (id) => {
+                setFormData(prev => {
+                    const current = prev.operazioniSelezionate;
+                    if (current.includes(id)) {
+                        return { ...prev, operazioniSelezionate: current.filter(i => i !== id) };
+                    } else {
+                        return { ...prev, operazioniSelezionate: [...current, id] };
+                    }
+                });
             };
 
             const formatDateFull = (dateString) => {
@@ -245,8 +261,8 @@ Staff Cosmedic Srl`;
             const handleSubmit = async (e) => {
                 e.preventDefault();
 
-                if (!formData.nome || !formData.cognome || !formData.emailPaziente) {
-                    alert('⚠️ Compilare tutti i campi obbligatori');
+                if (!formData.nome || !formData.cognome || !formData.emailPaziente || formData.operazioniSelezionate.length === 0) {
+                    alert('⚠️ Compilare tutti i campi obbligatori (selezionare almeno un tipo di operazione)');
                     return;
                 }
 
@@ -271,7 +287,7 @@ Staff Cosmedic Srl`;
                             cognome: formData.cognome,
                             email_paziente: formData.emailPaziente,
                             data_intervento: formData.dataIntervento,
-                            tipo_operazione_id: parseInt(formData.tipoOperazione),
+                            tipo_operazione_ids: formData.operazioniSelezionate,
                             orario_arrivo: orarioArrivo,
                             ora_inizio: formData.oraInizio,
                             contenuto_email: emailPreview,
@@ -312,7 +328,7 @@ Staff Cosmedic Srl`;
                         cognome: '',
                         emailPaziente: '',
                         dataIntervento: '',
-                        tipoOperazione: '',
+                        operazioniSelezionate: [],
                         oraInizio: '',
                         sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
                     });
@@ -468,22 +484,24 @@ Staff Cosmedic Srl`;
                                             {/* Tipo Operazione */}
                                             <div className="md:col-span-2">
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Tipo Operazione *
+                                                    Tipo Operazione * <span className="font-normal text-gray-500">(puoi selezionarne più di una)</span>
                                                 </label>
-                                                <select
-                                                    name="tipoOperazione"
-                                                    value={formData.tipoOperazione}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    required
-                                                >
-                                                    <option value="">Seleziona un tipo...</option>
+                                                <div className="border border-gray-300 rounded-lg p-3 max-h-52 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-1">
                                                     {tipiOperazioni.map(op => (
-                                                        <option key={op.id} value={op.id}>
-                                                            {op.nome}
-                                                        </option>
+                                                        <label key={op.id} className="flex items-center gap-2 cursor-pointer hover:bg-blue-50 p-1.5 rounded transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.operazioniSelezionate.includes(op.id)}
+                                                                onChange={() => handleOperazioneChange(op.id)}
+                                                                className="w-4 h-4 accent-blue-600"
+                                                            />
+                                                            <span className="text-sm text-gray-700">{op.nome}</span>
+                                                        </label>
                                                     ))}
-                                                </select>
+                                                </div>
+                                                {formData.operazioniSelezionate.length > 0 && (
+                                                    <p className="text-xs text-blue-600 mt-1">✅ {formData.operazioniSelezionate.length} operazione/i selezionata/e</p>
+                                                )}
                                             </div>
 
                                             {/* Data Intervento */}
@@ -572,7 +590,7 @@ Staff Cosmedic Srl`;
                                         </div>
 
                                         {/* Info Allegati */}
-                                        {formData.tipoOperazione && getAllegati().length > 0 && (
+                                        {formData.operazioniSelezionate.length > 0 && getAllegati().length > 0 && (
                                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                                 <h3 className="font-medium text-blue-900 mb-2">📎 Allegati da includere:</h3>
                                                 <ul className="list-disc list-inside text-blue-800 text-sm">
@@ -584,7 +602,7 @@ Staff Cosmedic Srl`;
                                         )}
 
                                         {/* Anteprima Oggetto */}
-                                        {formData.tipoOperazione && formData.dataIntervento && (
+                                        {formData.operazioniSelezionate.length > 0 && formData.dataIntervento && (
                                             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                                                 <h3 className="font-medium text-gray-900 mb-2">✉️ Oggetto email:</h3>
                                                 <p className="text-gray-700 font-mono text-sm">{generateEmailSubject()}</p>
@@ -643,7 +661,7 @@ Staff Cosmedic Srl`;
                                                 {emailPreview || 'Compila il form per vedere l\'anteprima'}
                                             </div>
 
-                                            {formData.tipoOperazione && getAllegati().length > 0 && (
+                                            {formData.operazioniSelezionate.length > 0 && getAllegati().length > 0 && (
                                                 <div className="mt-4 pt-4 border-t border-gray-200">
                                                     <p className="text-sm text-gray-600 font-medium mb-2">📎 Allegati:</p>
                                                     <ul className="text-sm text-gray-600">
