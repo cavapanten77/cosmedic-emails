@@ -87,7 +87,7 @@ Staff Cosmedic Srl`;
                 dataIntervento: '',
                 tipoOperazione: '',
                 oraInizio: '',
-                sedeclinica: 'Cosmedic V. S. Eufemia 17, Milano'
+                sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
             });
 
             const [emailPreview, setEmailPreview] = useState('');
@@ -156,7 +156,7 @@ Staff Cosmedic Srl`;
                 oraInizioDate.setHours(parseInt(ore), parseInt(minuti), 0);
 
                 // Automatico: Cosmedic = 30 min, altre sedi = 60 min
-                const minutiPrima = formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' ? 30 : 60;
+                const minutiPrima = formData.sedeclinica === 'COSMEDIC Via Sant\'Eufemia 17 Milano' ? 30 : 60;
                 oraInizioDate.setMinutes(oraInizioDate.getMinutes() - minutiPrima);
 
                 const oreArrivo = String(oraInizioDate.getHours()).padStart(2, '0');
@@ -166,7 +166,7 @@ Staff Cosmedic Srl`;
             };
 
             const getTempoArrivoText = () => {
-                return formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano' ? 'mezz\'ora' : '1 ora';
+                return formData.sedeclinica === 'COSMEDIC Via Sant\'Eufemia 17 Milano' ? 'mezz\'ora' : '1 ora';
             };
 
             const generateEmailPreview = () => {
@@ -314,7 +314,7 @@ Staff Cosmedic Srl`;
                         dataIntervento: '',
                         tipoOperazione: '',
                         oraInizio: '',
-                        sedeclinica: 'Cosmedic V. S. Eufemia 17, Milano'
+                        sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
                     });
 
                     loadHistory();
@@ -545,7 +545,7 @@ Staff Cosmedic Srl`;
                                                             ⏰ {calculateOrarioArrivo()}
                                                         </p>
                                                         <p className="text-xs text-blue-600 mt-1">
-                                                            {formData.sedeclinica === 'Cosmedic V. S. Eufemia 17, Milano'
+                                                            {formData.sedeclinica === 'COSMEDIC Via Sant\'Eufemia 17 Milano'
                                                                 ? '📍 Sede Cosmedic: arrivo 30 minuti prima'
                                                                 : '📍 Altra sede: arrivo 1 ora prima'}
                                                         </p>
@@ -565,7 +565,7 @@ Staff Cosmedic Srl`;
                                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                     required
                                                 >
-                                                    <option value="Cosmedic V. S. Eufemia 17, Milano">Cosmedic V. S. Eufemia 17, Milano</option>
+                                                    <option value="COSMEDIC Via Sant'Eufemia 17 Milano">COSMEDIC Via Sant'Eufemia 17 Milano</option>
                                                     <option value="RESNATI PUNTO RAF VIA SANTA CROCE 10|A, Milano">RESNATI PUNTO RAF VIA SANTA CROCE 10|A, Milano</option>
                                                 </select>
                                             </div>
