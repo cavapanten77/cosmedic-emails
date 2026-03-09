@@ -79,16 +79,47 @@ module.exports = async function handler(req, res) {
         }
 
         const attachments = [];
+        const attachmentWarnings = [];
 
         if (attachmentPaths && attachmentPaths.length > 0) {
             for (const filePath of attachmentPaths) {
                 try {
+                    console.log(`📎 Tentativo download allegato: "${filePath}"`);
+
                     const { data, error } = await supabase.storage
                         .from('allegati')
                         .download(filePath);
 
                     if (error) {
-                        console.error(`Errore download allegato ${filePath}:`, error);
+                        const warnMsg = `ERRORE download "${filePath}": ${JSON.stringify(error)}`;
+                        console.error('❌', warnMsg);
+                        attachmentWarnings.push(warnMsg);
+
+                        // Fallback: prova con signed URL (1 ora)
+                        console.log(`🔄 Fallback: tentativo signed URL per "${filePath}"...`);
+                        const { data: signedData, error: signedError } = await supabase.storage
+                            .from('allegati')
+                            .createSignedUrl(filePath, 3600);
+
+                        if (signedError || !signedData?.signedUrl) {
+                            const signedWarn = `ERRORE signed URL "${filePath}": ${JSON.stringify(signedError)}`;
+                            console.error('❌', signedWarn);
+                            attachmentWarnings.push(signedWarn);
+                            continue;
+                        }
+
+                        // Fetch dal signed URL
+                        const fetch = require('node-fetch');
+                        const fetchResp = await fetch(signedData.signedUrl);
+                        if (!fetchResp.ok) {
+                            const fetchWarn = `ERRORE fetch signed URL "${filePath}": ${fetchResp.status} ${fetchResp.statusText}`;
+                            console.error('❌', fetchWarn);
+                            attachmentWarnings.push(fetchWarn);
+                            continue;
+                        }
+                        const buffer = Buffer.from(await fetchResp.arrayBuffer());
+                        attachments.push({ filename: path.basename(filePath), content: buffer });
+                        console.log(`✅ Allegato scaricato via signed URL: "${filePath}"`);
                         continue;
                     }
 
@@ -97,8 +128,11 @@ module.exports = async function handler(req, res) {
                         filename: path.basename(filePath),
                         content: buffer
                     });
-                } catch (error) {
-                    console.error(`Errore processing allegato ${filePath}:`, error);
+                    console.log(`✅ Allegato scaricato: "${filePath}"`);
+                } catch (err) {
+                    const warnMsg = `ECCEZIONE processing allegato "${filePath}": ${err.message}`;
+                    console.error('❌', warnMsg);
+                    attachmentWarnings.push(warnMsg);
                 }
             }
         }
@@ -140,7 +174,10 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
             success: true,
             message: 'Email inviata con successo',
-            messageId: info.messageId
+            messageId: info.messageId,
+            allegatiCaricati: attachments.length,
+            allegatiRichiesti: (attachmentPaths || []).length,
+            warnings: attachmentWarnings.length > 0 ? attachmentWarnings : undefined
         });
 
     } catch (error) {

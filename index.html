@@ -321,7 +321,13 @@ Staff Cosmedic Srl`;
                         throw new Error(errorData.message || 'Errore invio email');
                     }
 
-                    alert('✅ Email inviata con successo!');
+                    const result = await response.json();
+
+                    if (result.warnings && result.warnings.length > 0) {
+                        alert(`⚠️ Email inviata, ma ALLEGATI NON CARICATI (${result.allegatiCaricati}/${result.allegatiRichiesti}):\n\n${result.warnings.join('\n')}`);
+                    } else {
+                        alert(`✅ Email inviata con successo! Allegati: ${result.allegatiCaricati}/${result.allegatiRichiesti}`);
+                    }
 
                     // Reset form
                     setFormData({
