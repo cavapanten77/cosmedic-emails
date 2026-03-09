@@ -41,7 +41,8 @@
                 sendEmailEndpoint: '/api/send-email'
             },
             email: {
-                cc: ['mattia.cardini@medassure.it', 'mfantacci31@gmail.com']
+                // cc: ['mattia.cardini@medassure.it', 'mfantacci31@gmail.com'] // Disabilitati per test
+                cc: []
             }
         };
 
@@ -476,8 +477,8 @@ Staff Cosmedic Srl`;
                                                     placeholder="paziente@email.com"
                                                     required
                                                 />
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    CC automatico: mattia.cardini@medassure.it, mfantacci31@gmail.com
+                                                <p className="text-xs text-orange-500 mt-1">
+                                                    ⚠️ CC disabilitato (modalità test)
                                                 </p>
                                             </div>
 
@@ -649,8 +650,8 @@ Staff Cosmedic Srl`;
                                                 <p className="text-sm text-gray-600">
                                                     <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
                                                 </p>
-                                                <p className="text-sm text-gray-600">
-                                                    <strong>CC:</strong> mattia.cardini@medassure.it, mfantacci31@gmail.com
+                                                <p className="text-sm text-orange-500">
+                                                    <strong>CC:</strong> ⚠️ Disabilitato (modalità test)
                                                 </p>
                                                 <p className="text-sm text-gray-600">
                                                     <strong>Oggetto:</strong> {generateEmailSubject()}
