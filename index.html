@@ -200,7 +200,10 @@ Staff Cosmedic Srl`;
 
             const getTipoOperazioneNome = () => {
                 return formData.operazioniSelezionate
-                    .map(id => tipiOperazioni.find(op => op.id === id)?.nome)
+                    .map(id => {
+                        const nome = tipiOperazioni.find(op => op.id === id)?.nome;
+                        return nome ? nome.replace(/\s*\(.*?\)/g, '').trim() : null;
+                    })
                     .filter(Boolean)
                     .join(', ');
             };
