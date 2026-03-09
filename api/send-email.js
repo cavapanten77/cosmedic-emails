@@ -152,21 +152,16 @@ module.exports = async function handler(req, res) {
         const info = await transporter.sendMail(mailOptions);
         console.log('✅ SMTP send successful:', info.messageId);
 
-        // Build raw RFC 2822 message for IMAP
-        // Encode subject with RFC 2047 (Base64) to handle special chars like < > ( )
-        const encodedSubject = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
-        const ccLine = (cc && cc.length) ? `Cc: ${cc.join(', ')}\r\n` : '';
-        const rawMessage = Buffer.from(
-            `From: ${mailOptions.from}\r\n` +
-            `To: ${to}\r\n` +
-            `${ccLine}` +
-            `Subject: ${encodedSubject}\r\n` +
-            `Date: ${new Date().toUTCString()}\r\n` +
-            `MIME-Version: 1.0\r\n` +
-            `Content-Type: text/html; charset=utf-8\r\n` +
-            `\r\n` +
-            `${mailOptions.html}`
-        );
+        // Build raw RFC 2822 message for IMAP using MailComposer
+        // This correctly includes attachments and proper MIME encoding
+        const MailComposer = require('nodemailer/lib/mail-composer');
+        const rawMessage = await new Promise((resolve, reject) => {
+            const mail = new MailComposer(mailOptions);
+            mail.compile().build((err, message) => {
+                if (err) reject(err);
+                else resolve(message);
+            });
+        });
 
         // Await IMAP save BEFORE returning (Vercel kills background tasks on res.send)
         await saveToSentFolder(rawMessage);
