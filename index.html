@@ -88,7 +88,7 @@ Staff Cosmedic Srl`;
                 operazioniSelezionate: [],
                 oraInizio: '',
                 sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano',
-                includiCc: true
+                ccSelezionati: [...CONFIG.email.cc]
             });
 
             const [emailPreview, setEmailPreview] = useState('');
@@ -224,6 +224,17 @@ Staff Cosmedic Srl`;
                 }));
             };
 
+            const handleCcChange = (email) => {
+                setFormData(prev => {
+                    const current = prev.ccSelezionati;
+                    if (current.includes(email)) {
+                        return { ...prev, ccSelezionati: current.filter(c => c !== email) };
+                    } else {
+                        return { ...prev, ccSelezionati: [...current, email] };
+                    }
+                });
+            };
+
             const handleOperazioneChange = (id) => {
                 setFormData(prev => {
                     const current = prev.operazioniSelezionate;
@@ -271,7 +282,7 @@ Staff Cosmedic Srl`;
                 }
 
                 const subject = generateEmailSubject();
-                const actualCc = formData.includiCc ? CONFIG.email.cc : [];
+                const actualCc = formData.ccSelezionati;
 
                 if (!confirm(`Confermi l'invio della email?\n\nOggetto: ${subject}\nA: ${formData.emailPaziente}\nCC: ${actualCc.length > 0 ? actualCc.join(', ') : 'Nessuno'}`)) {
                     return;
@@ -341,7 +352,7 @@ Staff Cosmedic Srl`;
                         operazioniSelezionate: [],
                         oraInizio: '',
                         sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano',
-                        includiCc: true
+                        ccSelezionati: [...CONFIG.email.cc]
                     });
 
                     loadHistory();
@@ -487,17 +498,22 @@ Staff Cosmedic Srl`;
                                                     placeholder="paziente@email.com"
                                                     required
                                                 />
-                                                <label className="flex items-center gap-2 mt-2 cursor-pointer w-fit">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.includiCc}
-                                                        onChange={(e) => setFormData(prev => ({...prev, includiCc: e.target.checked}))}
-                                                        className="w-4 h-4 accent-blue-600"
-                                                    />
-                                                    <span className="text-sm text-gray-600">
-                                                        Includi in CC automatico: {CONFIG.email.cc.join(', ')}
-                                                    </span>
-                                                </label>
+                                                <div className="mt-2 space-y-1">
+                                                    <span className="text-sm font-medium text-gray-700">Includi in CC:</span>
+                                                    {CONFIG.email.cc.map(email => (
+                                                        <label key={email} className="flex items-center gap-2 cursor-pointer w-fit">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.ccSelezionati.includes(email)}
+                                                                onChange={() => handleCcChange(email)}
+                                                                className="w-4 h-4 accent-blue-600"
+                                                            />
+                                                            <span className="text-sm text-gray-600">
+                                                                {email}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
                                             </div>
 
                                             {/* Tipo Operazione */}
@@ -669,7 +685,7 @@ Staff Cosmedic Srl`;
                                                     <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
-                                                    <strong>CC:</strong> {formData.includiCc ? CONFIG.email.cc.join(', ') : 'Nessuno'}
+                                                    <strong>CC:</strong> {formData.ccSelezionati.length > 0 ? formData.ccSelezionati.join(', ') : 'Nessuno'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
                                                     <strong>Oggetto:</strong> {generateEmailSubject()}
