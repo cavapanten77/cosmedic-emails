@@ -87,7 +87,8 @@ Staff Cosmedic Srl`;
                 dataIntervento: '',
                 operazioniSelezionate: [],
                 oraInizio: '',
-                sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
+                sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano',
+                includiCc: true
             });
 
             const [emailPreview, setEmailPreview] = useState('');
@@ -270,8 +271,9 @@ Staff Cosmedic Srl`;
                 }
 
                 const subject = generateEmailSubject();
+                const actualCc = formData.includiCc ? CONFIG.email.cc : [];
 
-                if (!confirm(`Confermi l'invio della email?\n\nOggetto: ${subject}\nA: ${formData.emailPaziente}\nCC: ${CONFIG.email.cc.join(', ')}`)) {
+                if (!confirm(`Confermi l'invio della email?\n\nOggetto: ${subject}\nA: ${formData.emailPaziente}\nCC: ${actualCc.length > 0 ? actualCc.join(', ') : 'Nessuno'}`)) {
                     return;
                 }
 
@@ -308,7 +310,7 @@ Staff Cosmedic Srl`;
                         },
                         body: JSON.stringify({
                             to: formData.emailPaziente,
-                            cc: CONFIG.email.cc,
+                            cc: actualCc,
                             subject: subject,
                             body: emailPreview,
                             attachmentPaths: getAllegati()
@@ -338,7 +340,8 @@ Staff Cosmedic Srl`;
                         dataIntervento: '',
                         operazioniSelezionate: [],
                         oraInizio: '',
-                        sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano'
+                        sedeclinica: 'COSMEDIC Via Sant\'Eufemia 17 Milano',
+                        includiCc: true
                     });
 
                     loadHistory();
@@ -484,9 +487,17 @@ Staff Cosmedic Srl`;
                                                     placeholder="paziente@email.com"
                                                     required
                                                 />
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    CC automatico: mattia.cardini@medassure.it, mfantacci31@gmail.com
-                                                </p>
+                                                <label className="flex items-center gap-2 mt-2 cursor-pointer w-fit">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.includiCc}
+                                                        onChange={(e) => setFormData(prev => ({...prev, includiCc: e.target.checked}))}
+                                                        className="w-4 h-4 accent-blue-600"
+                                                    />
+                                                    <span className="text-sm text-gray-600">
+                                                        Includi in CC automatico: {CONFIG.email.cc.join(', ')}
+                                                    </span>
+                                                </label>
                                             </div>
 
                                             {/* Tipo Operazione */}
@@ -658,7 +669,7 @@ Staff Cosmedic Srl`;
                                                     <strong>A:</strong> {formData.emailPaziente || '(email non specificata)'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
-                                                    <strong>CC:</strong> mattia.cardini@medassure.it, mfantacci31@gmail.com
+                                                    <strong>CC:</strong> {formData.includiCc ? CONFIG.email.cc.join(', ') : 'Nessuno'}
                                                 </p>
                                                 <p className="text-sm text-gray-600">
                                                     <strong>Oggetto:</strong> {generateEmailSubject()}
